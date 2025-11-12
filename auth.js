@@ -116,4 +116,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 return 'Ocorreu um erro. Tente novamente.';
         }
     }
+
+    // --- 7. LÓGICA DE VISUALIZAÇÃO DE SENHA ---
+    const toggleLoginPassBtn = document.getElementById('toggle-login-pass');
+    const toggleRegisterPassBtn = document.getElementById('toggle-register-pass');
+    const loginPasswordInput = document.getElementById('login-password');
+    const registerPasswordInput = document.getElementById('register-password');
+
+    function togglePasswordVisibility(input, button) {
+        if (input.type === 'password') {
+            input.type = 'text';
+            button.textContent = 'Ocultar';
+        } else {
+            input.type = 'password';
+            button.textContent = 'Mostrar';
+        }
+    }
+
+    if (toggleLoginPassBtn && loginPasswordInput) {
+        toggleLoginPassBtn.addEventListener('click', () => {
+            togglePasswordVisibility(loginPasswordInput, toggleLoginPassBtn);
+        });
+    }
+
+    if (toggleRegisterPassBtn && registerPasswordInput) {
+        toggleRegisterPassBtn.addEventListener('click', () => {
+            togglePasswordVisibility(registerPasswordInput, toggleRegisterPassBtn);
+        });
+    }
 });
