@@ -124,13 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const registerPasswordInput = document.getElementById('register-password');
 
     function togglePasswordVisibility(input, button) {
-        if (input.type === 'password') {
-            input.type = 'text';
-            button.textContent = 'Ocultar';
-        } else {
-            input.type = 'password';
-            button.textContent = 'Mostrar';
-        }
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        // Atualiza atributos de acessibilidade e texto visível para leitores de tela
+        button.setAttribute('aria-pressed', String(isHidden));
+        const sr = button.querySelector('.sr-only');
+        if (sr) sr.textContent = isHidden ? 'Ocultar senha' : 'Mostrar senha';
+        button.setAttribute('aria-label', isHidden ? 'Ocultar senha' : 'Mostrar senha');
+        // Opcional: trocar ícone poderia ser feito aqui mudando o path do svg
     }
 
     if (toggleLoginPassBtn && loginPasswordInput) {
