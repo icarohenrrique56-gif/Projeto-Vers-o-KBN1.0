@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban PCM - Heineken</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Sortable.js (Drag and Drop) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- DOMPurify (Segurança) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <!-- Fonte -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .sortable-ghost { opacity: 0.3; background: #dbeafe; border: 2px dashed #60a5fa; }
+        .sortable-chosen { cursor: grabbing; opacity: 0.9; transform: scale(1.02); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .kanban-column-body { max-height: 75vh; overflow-y: auto; }
+        /* Scrollbar customizada (opcional, mas profissional) */
+        .kanban-column-body::-webkit-scrollbar { width: 8px; }
+        .kanban-column-body::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .kanban-column-body::-webkit-scrollbar-track { background-color: #f1f5f9; }
+    </style>
+</head>
+<body class="antialiased text-gray-900">
+
+<!-- Cabeçalho -->
+<header class="bg-green-800 text-white shadow-lg sticky top-0 z-40">
+    <div class="container mx-auto max-w-full px-4 md:px-8 py-4 flex flex-wrap justify-between items-center">
+        <!-- Logo e Título -->
+        <div class="flex items-center space-x-3 mb-2 md:mb-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-green-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.5 12a7.5 7.5 0 0 0 15 0"/></svg>
+            <div>
+                <h1 class="text-2xl font-bold">Kanban Peças</h1>
+                <p class="text-sm text-gray-200 font-light">Cervejaria Heineken</p>
+            </div>
+        </div>
+        <!-- Botões de Ação -->
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 mr-2">
+                <label for="header-priority-select" class="text-sm font-medium sr-only">Filtrar Prioridade</label>
+                <select id="header-priority-select" class="px-3 py-2 rounded-lg bg-white text-gray-800 text-sm border border-green-600 focus:ring-2 focus:ring-green-300 outline-none">
+                    <option value="all" selected>Todas</option>
+                    <option value="low">Baixa</option>
+                    <option value="medium">Média</option>
+                    <option value="high">Alta</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2 mr-2">
+                <span class="text-sm text-white font-medium sr-only">Prioridade Atual</span>
+                <span id="title-priority-badge" class="text-xs font-semibold px-2 py-1 rounded-full bg-gray-500 text-white">Todas</span>
+            </div>
+            <button id="add-task-btn" class="bg-green-600 hover:bg-green-700 px-5 py-2 rounded-lg font-semibold transition-colors">Adicionar</button>
+            <button id="logout-btn" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">Sair</button>
+        </div>
+    </div>
+</header>
+
+<!-- Barra de Status da Autenticação -->
+<div id="auth-status" class="py-2 px-6 bg-green-900 text-green-200 text-sm text-center sticky top-[80px] z-30">A conectar...</div>
+
+<!-- Corpo Principal do Kanban -->
+<main id="kanban-board" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 p-6">
+    
+    <!-- Coluna 1: A RESTAURAR -->
+    <div class="kanban-column bg-white rounded-xl shadow-lg flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-[124px] bg-white rounded-t-xl z-10">
+            <div class="flex items-center space-x-3">
+                <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                <h3 class="font-semibold text-red-600 uppercase text-sm">A RESTAURAR</h3>
+            </div>
+            <span id="count-col-restaurar" class="px-2.5 py-0.5 bg-gray-200 text-gray-700 rounded-full font-semibold text-xs">0</span>
+        </div>
+        <div id="col-restaurar" class="p-4 space-y-4 kanban-column-body flex-grow min-h-[200px]" data-column-id="col-restaurar"></div>
+    </div>
+
+    <!-- Coluna 2: EM DIAGNÓSTICO -->
+    <div class="kanban-column bg-white rounded-xl shadow-lg flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-[124px] bg-white rounded-t-xl z-10">
+            <div class="flex items-center space-x-3">
+                <span class="w-3 h-3 bg-yellow-500 rounded-full"></span>
+                <h3 class="font-semibold text-yellow-600 uppercase text-sm">EM DIAGNÓSTICO</h3>
+            </div>
+            <span id="count-col-diagnostico" class="px-2.5 py-0.5 bg-gray-200 text-gray-700 rounded-full font-semibold text-xs">0</span>
+        </div>
+        <div id="col-diagnostico" class="p-4 space-y-4 kanban-column-body flex-grow min-h-[200px]" data-column-id="col-diagnostico"></div>
+    </div>
+
+    <!-- Coluna 3: EM RESTAURAÇÃO -->
+    <div class="kanban-column bg-white rounded-xl shadow-lg flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-[124px] bg-white rounded-t-xl z-10">
+            <div class="flex items-center space-x-3">
+                <span class="w-3 h-3 bg-orange-500 rounded-full"></span>
+                <h3 class="font-semibold text-orange-600 uppercase text-sm">EM RESTAURAÇÃO</h3>
+            </div>
+            <span id="count-col-restauracao" class="px-2.5 py-0.5 bg-gray-200 text-gray-700 rounded-full font-semibold text-xs">0</span>
+        </div>
+        <div id="col-restauracao" class="p-4 space-y-4 kanban-column-body flex-grow min-h-[200px]" data-column-id="col-restauracao"></div>
+    </div>
+
+    <!-- Coluna 4: EM TESTE / QUALIDADE -->
+    <div class="kanban-column bg-white rounded-xl shadow-lg flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-[124px] bg-white rounded-t-xl z-10">
+            <div class="flex items-center space-x-3">
+                <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+                <h3 class="font-semibold text-blue-600 uppercase text-sm">EM TESTE / QUALIDADE</h3>
+            </div>
+            <span id="count-col-teste" class="px-2.5 py-0.5 bg-gray-200 text-gray-700 rounded-full font-semibold text-xs">0</span>
+        </div>
+        <div id="col-teste" class="p-4 space-y-4 kanban-column-body flex-grow min-h-[200px]" data-column-id="col-teste"></div>
+    </div>
+
+    <!-- Coluna 5: PRONTO PARA USO -->
+    <div class="kanban-column bg-white rounded-xl shadow-lg flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center sticky top-[124px] bg-white rounded-t-xl z-10">
+            <div class="flex items-center space-x-3">
+                <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                <h3 class="font-semibold text-green-600 uppercase text-sm">PRONTO PARA USO</h3>
+            </div>
+            <span id="count-col-pronto" class="px-2.5 py-0.5 bg-gray-200 text-gray-700 rounded-full font-semibold text-xs">0</span>
+        </div>
+        <div id="col-pronto" class="p-4 space-y-4 kanban-column-body flex-grow min-h-[200px]" data-column-id="col-pronto"></div>
+    </div>
+</main>
+
+<!-- Modal de Adicionar/Editar Tarefa -->
+<div id="task-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden transition-opacity duration-200 opacity-0">
+    <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full transform scale-95 opacity-0 transition-all duration-200" id="task-modal-content">
+        <form id="task-form" autocomplete="off">
+            <div class="flex justify-between items-center p-5 border-b border-gray-200">
+                <h4 id="modal-title" class="text-2xl font-semibold text-gray-800">Adicionar</h4>
+                <button type="button" id="close-modal-btn" class="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Fechar modal">✕</button>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <label for="task-id-input" class="block text-sm font-medium text-gray-700 mb-1">Nº / Código (Obrigatório)</label>
+                    <input type="text" id="task-id-input" placeholder="Ex: OS-45102" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
+                    <p id="task-id-display" class="text-lg font-medium text-gray-600 hidden"></p>
+                </div>
+                <div>
+                    <label for="task-text-input" class="block text-sm font-medium text-gray-700 mb-1">Descrição do Serviço <span class="text-red-500">*</span></label>
+                    <textarea id="task-text-input" rows="4" placeholder="Descreva o serviço..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required></textarea>
+                </div>
+                <div>
+                    <label for="task-priority-input" class="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+                    <select id="task-priority-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-green-500 outline-none">
+                        <option value="low">Baixa</option>
+                        <option value="medium" selected>Média</option>
+                        <option value="high">Alta</option>
+                    </select>
+                </div>
+                <input type="hidden" id="task-id-hidden">
+                <p id="modal-error-message" class="text-red-500 text-sm h-5"></p>
+            </div>
+            <div class="flex justify-end items-center space-x-4 p-5 bg-gray-50 rounded-b-lg">
+                <button type="button" id="cancel-modal-btn" class="px-5 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors">Cancelar</button>
+                <button type="submit" id="save-task-btn" class="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:bg-gray-400">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden transition-opacity duration-200 opacity-0">
+    <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full transform scale-95 opacity-0 transition-all duration-200" id="delete-modal-content">
+        <h4 class="text-xl font-semibold mb-4">Confirmar exclusão</h4>
+        <p class="text-gray-600 mb-6">Tem certeza de que deseja excluir este item?</p>
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-delete-btn" class="px-5 py-2 rounded-lg bg-gray-300 text-gray-800 hover:bg-gray-400 transition-colors">Cancelar</button>
+            <button id="confirm-delete-btn" class="px-5 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-400">Excluir</button>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts do Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<!-- Script de Configuração Centralizado -->
+<script src="firebase-init.js"></script>
+
+<!-- Script Principal da Aplicação -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // --- 1. CONFIGURAÇÃO DO FIREBASE ---
+    // 'app' é inicializado em 'firebase-init.js'
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // --- 2. VARIÁVEIS GLOBAIS E ESTADO ---
+    let currentUser = null;
+    let userUid = null;
+    let dbTasksRef = null; // Referência do nó de tarefas (Realtime DB)
+    let taskToDeleteId = null;
+    let unsubscribeSnapshot = null; // Função para parar de ouvir o DB
+
+    // --- 3. MAPEAMENTO DE ELEMENTOS DO DOM ---
+    const authStatus = document.getElementById('auth-status');
+    const logoutBtn = document.getElementById('logout-btn');
+    const addTaskBtn = document.getElementById('add-task-btn');
+    const headerPrioritySelect = document.getElementById('header-priority-select');
+    const titlePriorityBadge = document.getElementById('title-priority-badge');
+
+    const columns = {
+        "col-restaurar": document.getElementById('col-restaurar'),
+        "col-diagnostico": document.getElementById('col-diagnostico'),
+        "col-restauracao": document.getElementById('col-restauracao'),
+        "col-teste": document.getElementById('col-teste'),
+        "col-pronto": document.getElementById('col-pronto')
+    };
+    const columnIds = Object.keys(columns);
+    const columnCounts = {
+        "col-restaurar": document.getElementById('count-col-restaurar'),
+        "col-diagnostico": document.getElementById('count-col-diagnostico'),
+        "col-restauracao": document.getElementById('count-col-restauracao'),
+        "col-teste": document.getElementById('count-col-teste'),
+        "col-pronto": document.getElementById('count-col-pronto')
+    };
+
+    // Modais
+    const taskModal = document.getElementById('task-modal');
+    const taskModalContent = document.getElementById('task-modal-content');
+    const taskForm = document.getElementById('task-form');
+    const modalTitle = document.getElementById('modal-title');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const cancelModalBtn = document.getElementById('cancel-modal-btn');
+    const saveTaskBtn = document.getElementById('save-task-btn');
+    const taskIdInput = document.getElementById('task-id-input');
+    const taskIdDisplay = document.getElementById('task-id-display');
+    const taskTextInput = document.getElementById('task-text-input');
+    const taskPriorityInput = document.getElementById('task-priority-input');
+    const taskIdHidden = document.getElementById('task-id-hidden');
+    const modalErrorMessage = document.getElementById('modal-error-message');
+    
+    const deleteModal = document.getElementById('delete-modal');
+    const deleteModalContent = document.getElementById('delete-modal-content');
+    const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+    const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+
+    // --- 4. LÓGICA DE AUTENTICAÇÃO ---
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            userUid = user.uid;
+            
+            // Remove listeners antigos (se houver)
+            if (dbTasksRef && unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+            }
+            // Define a referência do nó: /users/{userId}/tasks
+            dbTasksRef = db.ref('users/' + userUid + '/tasks');
+            
+            const userName = user.email.split('@')[0];
+            authStatus.textContent = `Conectado como: ${userName.charAt(0).toUpperCase() + userName.slice(1)}`;
+            
+            // Inicializa o quadro e o "ouvinte" do Realtime Database
+            initRealtimeListener();
+            initSortable();
+
+        } else {
+            // Usuário não está logado
+            currentUser = null;
+            userUid = null;
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot(); // Garante que parou de ouvir
+            }
+            // Redireciona para a página de login
+            window.location.replace('login.html'); // <--- PONTO CHAVE
+        }
+    });
+
+    // Evento de Logout
+    logoutBtn.addEventListener('click', () => {
+        // Usando modal customizado (ou confirm)
+        // NOTA: 'confirm' pode não funcionar em todos os ambientes
+        if (window.confirm('Deseja realmente sair?')) {
+            auth.signOut().catch(error => {
+                console.error("Erro ao sair:", error);
+            });
+        }
+    });
+
+    // --- 5. LÓGICA DO BANCO DE DADOS (Realtime Database) ---
+
+    function initRealtimeListener() {
+        if (!dbTasksRef) return;
+
+        // Limpa o quadro
+        columnIds.forEach(id => columns[id].innerHTML = '');
+
+        const onChildAdded = (snap) => {
+            const task = snap.val();
+            const taskId = snap.key;
+            if (!task) return;
+            // Evita duplicatas se o listener disparar antes do DOM antigo sumir
+            if (document.querySelector(`[data-task-id="${taskId}"]`)) return; 
+            
+            const newCard = createTaskElement(task, taskId);
+            const colId = task.column || 'col-restaurar';
+            if (columns[colId]) {
+                columns[colId].appendChild(newCard);
+            }
+            applyPriorityFilter(); // Atualiza filtro e contagens
+        };
+
+        const onChildChanged = (snap) => {
+            const task = snap.val();
+            const taskId = snap.key;
+            if (!task) return;
+            
+            const existingCard = document.querySelector(`[data-task-id="${taskId}"]`);
+            const newColId = task.column || 'col-restaurar';
+            const updatedCard = createTaskElement(task, taskId);
+
+            if (existingCard) {
+                // Se mudou de coluna
+                if (existingCard.parentElement.dataset.columnId !== newColId && columns[newColId]) {
+                    columns[newColId].appendChild(updatedCard);
+                    existingCard.remove();
+                } else {
+                    // Apenas atualiza o conteúdo
+                    existingCard.replaceWith(updatedCard);
+                }
+            } else if (columns[newColId]) {
+                // Caso não existisse (ex: cache limpo)
+                columns[newColId].appendChild(updatedCard);
+            }
+            applyPriorityFilter(); // Atualiza filtro e contagens
+        };
+
+        const onChildRemoved = (snap) => {
+            const taskId = snap.key;
+            const existingCard = document.querySelector(`[data-task-id="${taskId}"]`);
+            if (existingCard) {
+                existingCard.remove();
+            }
+            applyPriorityFilter(); // Atualiza filtro e contagens
+        };
+
+        // Registra os listeners
+        dbTasksRef.on('child_added', onChildAdded);
+        dbTasksRef.on('child_changed', onChildChanged);
+        dbTasksRef.on('child_removed', onChildRemoved);
+
+        // Função para remover os listeners (usada no logout)
+        unsubscribeSnapshot = () => {
+            if (dbTasksRef) {
+                dbTasksRef.off('child_added', onChildAdded);
+                dbTasksRef.off('child_changed', onChildChanged);
+                dbTasksRef.off('child_removed', onChildRemoved);
+            }
+        };
+    }
+
+    /**
+     * Atualiza os contadores de todas as colunas (contando apenas cards visíveis).
+     */
+    function updateAllCounts() {
+        columnIds.forEach(colId => {
+            const count = Array.from(columns[colId].children)
+                             .filter(c => !c.classList.contains('hidden')).length;
+            columnCounts[colId].textContent = count;
+        });
+    }
+
+    /**
+     * Aplica filtro por prioridade e atualiza contagens.
+     */
+    function applyPriorityFilter(){
+        const val = headerPrioritySelect.value;
+        const cards = document.querySelectorAll('.task-card');
+
+        cards.forEach(card => {
+            // Esconde se o filtro NÃO for 'all' E a prioridade do card for diferente do filtro
+            const shouldHide = (val !== 'all') && (card.dataset.priority !== val);
+            card.classList.toggle('hidden', shouldHide);
+        });
+        
+        // Atualiza as contagens *depois* de aplicar o filtro
+        updateAllCounts();
+    }
+
+    // --- 6. RENDERIZAÇÃO E MODAIS (Funções Auxiliares) ---
+    
+    function showModal(modal, content){ 
+        modal.classList.remove('hidden'); 
+        setTimeout(()=>{ 
+            modal.classList.add('opacity-100'); 
+            content.classList.add('scale-100','opacity-100'); 
+            content.classList.remove('scale-95','opacity-0'); 
+        }, 10); // Pequeno delay para a transição CSS funcionar
+    }
+
+    function hideModal(modal, content){ 
+        content.classList.remove('scale-100','opacity-100'); 
+        content.classList.add('scale-95','opacity-0'); 
+        modal.classList.remove('opacity-100'); 
+        setTimeout(()=> modal.classList.add('hidden'), 200); // Espera a transição acabar
+    }
+
+    /**
+     * Abre o modal de tarefa em modo 'add' ou 'edit'.
+     */
+    async function openTaskModal(mode = 'add', taskId = null){
+        modalErrorMessage.textContent = '';
+        taskForm.reset();
+        
+        // Define a prioridade do modal com base no filtro selecionado
+        taskPriorityInput.value = (headerPrioritySelect.value !== 'all') 
+                                ? headerPrioritySelect.value 
+                                : 'medium'; // Padrão
+
+        saveTaskBtn.disabled = false;
+        saveTaskBtn.textContent = "Salvar";
+
+        if (mode === 'add') {
+            modalTitle.textContent = 'Adicionar Tarefa';
+            taskIdHidden.value = '';
+            taskIdInput.value = `OS-${Math.floor(10000 + Math.random() * 90000)}`; // Sugestão de ID
+            taskIdInput.classList.remove('hidden');
+            taskIdInput.disabled = false;
+            taskIdDisplay.classList.add('hidden');
+            
+            showModal(taskModal, taskModalContent);
+            setTimeout(()=> taskTextInput.focus(), 150);
+
+        } else if (mode === 'edit' && taskId) {
+            // Busca os dados mais recentes do DB
+            try {
+                const snap = await dbTasksRef.child(taskId).once('value');
+                if (!snap.exists()) {
+                    // Use um modal customizado se 'alert' for bloqueado
+                    console.error("Erro: Tarefa não encontrada.");
+                    return;
+                }
+                const task = snap.val();
+
+                modalTitle.textContent = 'Editar Tarefa';
+                taskIdHidden.value = taskId; // O ID real do DB
+                taskIdInput.classList.add('hidden');
+                taskIdInput.disabled = true;
+                taskIdDisplay.textContent = `ID: ${task.idOS || taskId}`; // Mostra o ID da OS
+                taskIdDisplay.classList.remove('hidden');
+                taskTextInput.value = task.text;
+                taskPriorityInput.value = task.priority || 'medium';
+                
+                showModal(taskModal, taskModalContent);
+                setTimeout(()=> taskTextInput.focus(), 150);
+
+            } catch(err) {
+                console.error("Erro ao carregar tarefa:", err);
+                // Use um modal customizado se 'alert' for bloqueado
+            }
+        }
+    }
+
+    function closeTaskModal(){ 
+        hideModal(taskModal, taskModalContent); 
+    }
+
+    function showDeleteModal(id){ 
+        taskToDeleteId = id; 
+        confirmDeleteBtn.disabled = false;
+        confirmDeleteBtn.textContent = "Excluir";
+        showModal(deleteModal, deleteModalContent); 
+    }
+
+    function hideDeleteModal(){ 
+        hideModal(deleteModal, deleteModalContent); 
+        taskToDeleteId = null; 
+    }
+
+    /**
+     * Retorna classes CSS com base na prioridade.
+     */
+    function getPriorityClasses(priority){
+        switch(priority) {
+            case 'high': return { border:'border-red-500', text:'Alta', bg:'bg-red-500' };
+            case 'medium': return { border:'border-orange-500', text:'Média', bg:'bg-orange-500' };
+            case 'low': return { border:'border-blue-500', text:'Baixa', bg:'bg-blue-500' };
+            default: return { border:'border-gray-400', text:'N/D', bg:'bg-gray-400' };
+        }
+    }
+
+    /**
+     * Atualiza o badge de prioridade no cabeçalho.
+     */
+    function updatePriorityBadges(){
+        const val = headerPrioritySelect.value;
+        const p = (val === 'all') ? { text:'Todas', bg:'bg-gray-500' } : getPriorityClasses(val);
+        
+        titlePriorityBadge.textContent = p.text;
+        // Reseta as classes antes de adicionar a nova cor
+        titlePriorityBadge.className = `text-xs font-semibold px-2 py-1 rounded-full text-white ${p.bg}`;
+    }
+
+    /**
+     * Cria e retorna um elemento DOM para o card da tarefa.
+     */
+    function createTaskElement(task, taskId){
+        const p = getPriorityClasses(task.priority);
+        // Sanitiza o input para segurança (previne XSS)
+        const idSan = DOMPurify.sanitize(task.idOS || taskId || '');
+        const textSan = DOMPurify.sanitize(task.text);
+        
+        const card = document.createElement('div');
+        card.className = `task-card bg-white p-4 rounded-lg shadow-md border-l-4 ${p.border} cursor-move group relative`;
+        card.dataset.taskId = taskId; // Chave única do Realtime DB
+        card.dataset.priority = task.priority || 'medium';
+        
+        card.innerHTML = `
+            <p class="text-sm font-semibold text-gray-500">${idSan}</p>
+            <p class="text-gray-800 mt-1.5 font-medium task-text">${textSan}</p>
+            <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${p.bg} text-white">${p.text}</span>
+            </div>
+            <button class="delete-task-btn absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Excluir Tarefa">✕</button>
+        `;
+        
+        // Evento de clique para EDITAR
+        card.addEventListener('click', () => openTaskModal('edit', card.dataset.taskId));
+        
+        // Evento de clique para EXCLUIR (no botão específico)
+        card.querySelector('.delete-task-btn').addEventListener('click', (e)=>{ 
+            e.stopPropagation(); // Impede que o clique no botão abra o modal de edição
+            showDeleteModal(card.dataset.taskId); 
+        });
+        
+        return card;
+    }
+
+    // --- 7. EVENT LISTENERS PRINCIPAIS ---
+
+    // Filtro de prioridade
+    headerPrioritySelect.addEventListener('change', () => { 
+        updatePriorityBadges(); 
+        applyPriorityFilter(); 
+    });
+
+    // Submissão do Formulário (Adicionar/Editar)
+    taskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        modalErrorMessage.textContent = '';
+        saveTaskBtn.disabled = true;
+        saveTaskBtn.textContent = "Salvando...";
+
+        const text = taskTextInput.value.trim();
+        const priority = taskPriorityInput.value;
+        const editingId = taskIdHidden.value; // ID do nó (se estiver editando)
+
+        if (!text) { 
+            modalErrorMessage.textContent = 'A descrição é obrigatória.'; 
+            saveTaskBtn.disabled = false;
+            saveTaskBtn.textContent = "Salvar";
+            return; 
+        }
+
+        try {
+            if (editingId) {
+                // --- MODO EDIÇÃO (UPDATE) ---
+                // Apenas atualiza texto e prioridade
+                await dbTasksRef.child(editingId).update({
+                    text: text,
+                    priority: priority
+                });
+            } else {
+                // --- MODO ADIÇÃO (PUSH) ---
+                const idOS = taskIdInput.value.trim().toUpperCase();
+                if (!idOS) { 
+                    modalErrorMessage.textContent = 'Nº / Código é obrigatório.'; 
+                    saveTaskBtn.disabled = false;
+                    saveTaskBtn.textContent = "Salvar";
+                    return; 
+                }
+
+                // Verifica se o ID da OS já existe
+                const existsSnap = await dbTasksRef.orderByChild('idOS').equalTo(idOS).once('value');
+                if (existsSnap.exists()) {
+                    modalErrorMessage.textContent = 'Este Nº/Código (OS) já existe.';
+                    saveTaskBtn.disabled = false;
+                    saveTaskBtn.textContent = "Salvar";
+                    return;
+                }
+
+                const newTask = {
+                    idOS: idOS,
+                    text: text,
+                    priority: priority,
+                    column: 'col-restaurar', // Sempre começa na primeira coluna
+                    createdAt: firebase.database.ServerValue.TIMESTAMP // Adiciona data de criação
+                };
+                
+                // Usa push() para gerar uma chave única e salvar os dados
+                await dbTasksRef.push(newTask);
+            }
+            
+            closeTaskModal();
+            // O listener 'child_added' ou 'child_changed' cuidará da renderização
+
+        } catch (err) {
+             console.error("Erro ao salvar tarefa:", err);
+             modalErrorMessage.textContent = 'Erro ao salvar: ' + err.message;
+             saveTaskBtn.disabled = false;
+             saveTaskBtn.textContent = "Salvar";
+        }
+    });
+
+    // Confirmação de Exclusão
+    confirmDeleteBtn.addEventListener('click', async () => {
+        if (taskToDeleteId) {
+            confirmDeleteBtn.disabled = true;
+            confirmDeleteBtn.textContent = "Excluindo...";
+            try {
+                await dbTasksRef.child(taskToDeleteId).remove();
+                hideDeleteModal();
+                // O listener 'child_removed' cuidará da remoção do DOM
+            } catch (err) {
+                console.error("Erro ao excluir:", err);
+                // alert("Erro ao excluir: " + err.message);
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.textContent = "Excluir";
+            }
+        }
+    });
+
+    // Fechar modais
+    cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+    closeModalBtn.addEventListener('click', closeTaskModal);
+    cancelModalBtn.addEventListener('click', closeTaskModal);
+    // Fechar clicando fora
+    taskModal.addEventListener('click', (e) => { if (e.target === taskModal) closeTaskModal(); });
+    deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) hideDeleteModal(); });
+    
+    // Botão de adicionar tarefa
+    addTaskBtn.addEventListener('click', () => openTaskModal('add'));
+
+    // --- 8. INICIALIZAÇÃO DO DRAG & DROP (Sortable.js) ---
+
+    function initSortable(){
+        columnIds.forEach(colId => {
+            if (!columns[colId]) return; // Garante que a coluna existe
+            
+            new Sortable(columns[colId], {
+                group: 'kanban',
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                
+                // Ao soltar o card em uma nova coluna
+                onEnd: (evt) => {
+                    const taskId = evt.item.dataset.taskId;
+                    const newCol = evt.to.dataset.columnId;
+                    const oldCol = evt.from.dataset.columnId;
+
+                    if (!taskId || newCol === oldCol) return; // Nada mudou
+                    
+                    // Atualiza apenas a coluna no banco de dados
+                    dbTasksRef.child(taskId).update({ column: newCol })
+                    .then(() => {
+                        // Atualiza contadores locais imediatamente para resposta rápida
+                        updateAllCounts();
+                    })
+                    .catch(err => {
+                        console.error("Erro ao mover card:", err);
+                        // alert("Erro ao mover card. Revertendo movimento.");
+                        // Reverte o movimento visualmente
+                        evt.from.appendChild(evt.item);
+                        updateAllCounts(); // Recalcula
+                    });
+                }
+            });
+        });
+    }
+
+    // --- 9. EXECUÇÃO INICIAL ---
+    updatePriorityBadges(); // Define o badge inicial
+    // O restante da inicialização é feito pelo onAuthStateChanged
+})
+</script>
+</body>
+</html>
